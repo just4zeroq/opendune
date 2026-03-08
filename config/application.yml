@@ -1,0 +1,68 @@
+# OpenDune 配置文件
+
+# 应用配置
+app:
+  name: OpenDune
+  env: development
+  debug: true
+  log_level: INFO
+
+# 数据采集配置
+collection:
+  # 链上数据采集间隔(秒)
+  onchain_interval: 3
+  # CEX数据采集间隔(秒)
+  cex_interval: 1
+  # 健康检查间隔(秒)
+  health_check_interval: 30
+
+# Kafka配置
+kafka:
+  topics:
+    - name: onchain.blocks
+      partitions: 6
+      replication_factor: 1
+    - name: onchain.transactions
+      partitions: 6
+      replication_factor: 1
+    - name: onchain.logs
+      partitions: 6
+      replication_factor: 1
+    - name: cex.ticker
+      partitions: 6
+      replication_factor: 1
+    - name: cex.trades
+      partitions: 12
+      replication_factor: 1
+    - name: cex.klines
+      partitions: 6
+      replication_factor: 1
+    - name: alerts
+      partitions: 3
+      replication_factor: 1
+
+# Flink配置
+flink:
+  jobs:
+    - name: etl
+      parallelism: 4
+      checkpoint_interval: 60000
+    - name: metrics
+      parallelism: 4
+      checkpoint_interval: 60000
+    - name: aggregation
+      parallelism: 4
+      checkpoint_interval: 60000
+
+# 告警配置
+alerts:
+  channels:
+    - type: webhook
+      enabled: true
+      url: ${ALERT_WEBHOOK_URL}
+    - type: email
+      enabled: false
+      smtp_host: ${ALERT_EMAIL_SMTP_HOST}
+      smtp_port: ${ALERT_EMAIL_SMTP_PORT}
+      user: ${ALERT_EMAIL_USER}
+      password: ${ALERT_EMAIL_PASSWORD}

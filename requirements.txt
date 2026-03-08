@@ -1,0 +1,78 @@
+# OpenDune 依赖
+# Python 3.10+
+
+# 核心框架
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# 异步支持
+asyncio-mqtt==0.16.1
+aiokafka==0.9.1
+aiohttp==3.9.1
+aiofiles==23.2.1
+
+# 链上数据 - Alchemy + Web3
+web3==6.14.0
+# Alchemy SDK (使用官方Python SDK或直接用requests)
+requests==2.31.0
+websockets==12.0
+
+# 中心化交易所数据
+ccxt==4.2.18
+
+# 消息队列
+kafka-python==2.0.2
+confluent-kafka==2.3.0
+
+# 流处理 - PyFlink
+# 注意：PyFlink需要单独安装，参考 https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/python/installation/
+apache-flink==1.18.0
+
+# 数据存储
+sqlalchemy==2.0.25
+aiomysql==0.2.0
+redis==5.0.1
+aioredis==2.0.1
+taos==2.6.18  # TDengine Python connector
+pymysql==1.1.0
+
+# 数据处理
+pandas==2.1.4
+numpy==1.26.3
+pyarrow==14.0.2
+
+# 时序数据处理
+# tdengine-client 需要单独安装
+
+# 数据分析
+scipy==1.11.4
+ta-lib==0.4.28  # 技术指标
+
+# 日志和监控
+structlog==23.3.0
+prometheus-client==0.19.0
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-instrumentation-fastapi==0.43b0
+
+# 工具
+python-dotenv==1.0.0
+pyyaml==6.0.1
+ujson==5.9.0
+python-dateutil==2.8.2
+pytz==2023.3
+
+tenacity==8.2.3  # 重试机制
+httpx==0.26.0  # HTTP客户端
+
+# 开发依赖 (pip install -r requirements-dev.txt)
+# pytest==7.4.4
+# pytest-asyncio==0.23.3
+# pytest-cov==4.1.0
+# black==23.12.1
+# isort==5.13.2
+# mypy==1.8.0
+# flake8==7.0.0
+# testcontainers==3.7.8

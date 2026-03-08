@@ -1,0 +1,230 @@
+version: '3.8'
+
+services:
+  # Zookeeper (Kafka依赖)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.3
+    hostname: zookeeper
+    container_name: opendune-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.3
+    hostname: kafka
+    container_name: opendune-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  # Kafka UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: opendune-kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  # MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: opendune-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: opendune
+      MYSQL_USER: opendune
+      MYSQL_PASSWORD: opendune
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./src/data_storage/migration/mysql:/docker-entrypoint-initdb.d
+    command: --default-authentication-plugin=mysql_native_password
+
+  # TDengine
+  tdengine:
+    image: tdengine/tdengine:3.2.0.0
+    container_name: opendune-tdengine
+    ports:
+      - "6030:6030"
+      - "6041:6041"
+      - "6043-6060:6043-6060"
+    environment:
+      TAOS_FQDN: tdengine
+    volumes:
+      - tdengine_data:/var/lib/taos
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: opendune-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  # Flink Job Manager
+  flink-jobmanager:
+    image: flink:1.18-scala_2.12
+    container_name: opendune-flink-jobmanager
+    hostname: flink-jobmanager
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        parallelism.default: 2
+
+  # Flink Task Manager
+  flink-taskmanager:
+    image: flink:1.18-scala_2.12
+    container_name: opendune-flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.3.1
+    container_name: opendune-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./src/data_visualization/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - mysql
+      - tdengine
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.49.1
+    container_name: opendune-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # OpenDune 数据采集服务
+  opendune-collector:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.app
+    container_name: opendune-collector
+    depends_on:
+      - kafka
+      - mysql
+      - tdengine
+      - redis
+    environment:
+      - APP_ENV=development
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=opendune
+      - MYSQL_PASSWORD=opendune
+      - MYSQL_DATABASE=opendune
+      - TDENGINE_HOST=tdengine
+      - TDENGINE_PORT=6030
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+    command: python scripts/start_collector.py
+    restart: unless-stopped
+
+  # OpenDune API服务
+  opendune-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.app
+    container_name: opendune-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mysql
+      - tdengine
+      - redis
+      - kafka
+    environment:
+      - APP_ENV=development
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=opendune
+      - MYSQL_PASSWORD=opendune
+      - MYSQL_DATABASE=opendune
+      - TDENGINE_HOST=tdengine
+      - TDENGINE_PORT=6030
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+    command: python scripts/start_api.py
+    restart: unless-stopped
+
+volumes:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+  mysql_data:
+  tdengine_data:
+  redis_data:
+  grafana_data:
+  prometheus_data:

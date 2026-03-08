@@ -1,0 +1,33 @@
+# OpenDune 开发依赖
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# 代码质量
+black==23.12.1
+isort==5.13.2
+mypy==1.8.0
+flake8==7.0.0
+pylint==3.0.3
+
+# 测试工具
+factory-boy==3.3.0
+faker==22.2.0
+freezegun==1.4.0
+responses==0.24.1
+aioresponses==0.7.6
+
+# 容器测试
+testcontainers==3.7.8
+testcontainers-kafka==0.0.1
+testcontainers-mysql==0.0.1
+
+# 文档
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+
+# 调试
+ipython==8.20.0
+ipdb==0.13.13
+rich==13.7.0
