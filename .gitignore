@@ -85,3 +85,7 @@ dist/
 
 # OS files
 Thumbs.db
+
+# Claude
+.claude/
+
